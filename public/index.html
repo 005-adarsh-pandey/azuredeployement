@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Azure Lab Full Stack App</title>
+    <style>
+      :root {
+        --bg-1: #fdf8f2;
+        --bg-2: #f5e8d7;
+        --card: #ffffff;
+        --text: #1f1f1f;
+        --accent: #b45309;
+        --accent-2: #78350f;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        color: var(--text);
+        background: radial-gradient(circle at top right, var(--bg-2), var(--bg-1));
+        display: grid;
+        place-items: center;
+        padding: 20px;
+      }
+
+      .card {
+        width: min(680px, 100%);
+        background: var(--card);
+        border-radius: 16px;
+        padding: 24px;
+        box-shadow: 0 10px 30px rgba(120, 53, 15, 0.12);
+      }
+
+      h1 {
+        margin-top: 0;
+        font-size: clamp(1.5rem, 3vw, 2rem);
+      }
+
+      .row {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        margin: 16px 0;
+      }
+
+      input {
+        flex: 1;
+        min-width: 220px;
+        padding: 10px;
+        border: 1px solid #d6d3d1;
+        border-radius: 10px;
+      }
+
+      button {
+        border: none;
+        background: var(--accent);
+        color: white;
+        border-radius: 10px;
+        padding: 10px 16px;
+        cursor: pointer;
+        font-weight: 600;
+      }
+
+      button:hover {
+        background: var(--accent-2);
+      }
+
+      pre {
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 10px;
+        padding: 12px;
+        overflow: auto;
+      }
+    </style>
+  </head>
+  <body>
+    <main class="card">
+      <h1>Simple Full Stack App (No Database)</h1>
+      <p>Frontend calls backend API and shows response.</p>
+
+      <div class="row">
+        <button id="loadBtn">Load Backend Message</button>
+      </div>
+
+      <pre id="output">Click the button to call /api/message</pre>
+
+      <div class="row">
+        <input id="textInput" placeholder="Type text for echo API" />
+        <button id="echoBtn">Send to /api/echo</button>
+      </div>
+      <pre id="echoOut">Echo result appears here</pre>
+    </main>
+
+    <script>
+      const output = document.getElementById("output");
+      const echoOut = document.getElementById("echoOut");
+      const textInput = document.getElementById("textInput");
+
+      document.getElementById("loadBtn").addEventListener("click", async () => {
+        try {
+          const res = await fetch("/api/message");
+          const data = await res.json();
+          output.textContent = JSON.stringify(data, null, 2);
+        } catch (err) {
+          output.textContent = "Error: " + err.message;
+        }
+      });
+
+      document.getElementById("echoBtn").addEventListener("click", async () => {
+        try {
+          const res = await fetch("/api/echo", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ text: textInput.value })
+          });
+          const data = await res.json();
+          echoOut.textContent = JSON.stringify(data, null, 2);
+        } catch (err) {
+          echoOut.textContent = "Error: " + err.message;
+        }
+      });
+    </script>
+  </body>
+</html>
