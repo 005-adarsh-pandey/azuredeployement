@@ -39,9 +39,8 @@ jobs:
     runs-on: ubuntu-latest
     needs: build
     permissions:
+      id-token: write #Required when OIDC login path is used
       contents: read #This is required for actions/checkout
-    env:
-      AZURE_PUBLISH_PROFILE: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE || secrets.AZUREAPPSERVICE_PUBLISHPROFILE }}
 
     steps:
       - name: Download artifact from build job
@@ -49,22 +48,49 @@ jobs:
         with:
           name: node-app
 
-      - name: Validate publish profile secret
+      - name: Resolve deployment auth mode
+        id: auth
         run: |
-          if [ -z "$AZURE_PUBLISH_PROFILE" ]; then
-            echo "Missing publish profile secret."
-            echo "Add one of these repository secrets:"
-            echo "1) AZURE_WEBAPP_PUBLISH_PROFILE"
-            echo "2) AZUREAPPSERVICE_PUBLISHPROFILE"
-            echo "Value must be full XML from Azure Portal -> App Service -> Get publish profile."
-            exit 1
+          if [ -n "${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}" ] || [ -n "${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE }}" ]; then
+            echo "mode=publish" >> "$GITHUB_OUTPUT"
+            exit 0
           fi
 
-      - name: "Deploy to Azure Web App"
-        id: deploy-to-webapp
+          if [ -n "${{ secrets.AZUREAPPSERVICE_CLIENTID_37EF5F745EAD460DA9E860B241A1C204 }}" ] && \
+             [ -n "${{ secrets.AZUREAPPSERVICE_TENANTID_2F2D821A7B354C8EAAD26935844F005F }}" ] && \
+             [ -n "${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_5AD36BACCF3A4E83BC00130C9B9AEF81 }}" ]; then
+            echo "mode=oidc" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "No valid deployment auth found. Configure one of:"
+          echo "1) Publish profile secret: AZURE_WEBAPP_PUBLISH_PROFILE (or AZUREAPPSERVICE_PUBLISHPROFILE)"
+          echo "2) OIDC secrets: AZUREAPPSERVICE_CLIENTID_37EF5F745EAD460DA9E860B241A1C204, AZUREAPPSERVICE_TENANTID_2F2D821A7B354C8EAAD26935844F005F, AZUREAPPSERVICE_SUBSCRIPTIONID_5AD36BACCF3A4E83BC00130C9B9AEF81"
+          exit 1
+
+      - name: Login to Azure (OIDC)
+        if: steps.auth.outputs.mode == 'oidc'
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_37EF5F745EAD460DA9E860B241A1C204 }}
+          tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_2F2D821A7B354C8EAAD26935844F005F }}
+          subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_5AD36BACCF3A4E83BC00130C9B9AEF81 }}
+
+      - name: Deploy to Azure Web App (publish profile)
+        if: steps.auth.outputs.mode == 'publish'
+        id: deploy-to-webapp-publish
         uses: azure/webapps-deploy@v3
         with:
           app-name: "modelapp"
           slot-name: "Production"
-          publish-profile: ${{ env.AZURE_PUBLISH_PROFILE }}
+          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE || secrets.AZUREAPPSERVICE_PUBLISHPROFILE }}
+          package: .
+
+      - name: Deploy to Azure Web App (OIDC)
+        if: steps.auth.outputs.mode == 'oidc'
+        id: deploy-to-webapp-oidc
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: "modelapp"
+          slot-name: "Production"
           package: .
